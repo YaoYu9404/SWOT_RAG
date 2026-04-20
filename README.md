@@ -9,7 +9,7 @@ Built as a portfolio project to bridge domain expertise in satellite oceanograph
 ---
 
 ## Demo
-
+![SWOT RAG demo](assets/demo.png)
 ```
 Q: What spatial resolution does SWOT achieve for sea surface height?
 
