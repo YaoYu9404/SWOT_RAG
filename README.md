@@ -52,7 +52,8 @@ Answers are grounded in retrieved context rather than LLM parametric memory, whi
 └─────────────────────────────────────────────────────────┘
 ```
 
-**Tech stack:** LangChain · FAISS · OpenAI (embeddings + GPT-4o) · Streamlit · pypdf
+**Tech stack:** LangChain · FAISS · OpenAI (embeddings) · Anthropic Claude (generation) · Streamlit · pypdf
+
 
 ---
 
@@ -226,7 +227,7 @@ This is a local research tool — no API keys, no latency, no cost per query. Th
 ## Extension Roadmap
 
 - [ ] Metadata-filtered retrieval (e.g., restrict to post-2022 papers only)
-- [ ] Re-ranking step using a cross-encoder for improved precision
+- [x] Re-ranking step using a cross-encoder for improved precision
 - [ ] Multi-query retrieval: decompose complex questions into sub-queries
 - [ ] Fine-tuned embeddings on SWOT/oceanography vocabulary
 - [ ] Export Q&A logs as structured JSON for downstream analysis
