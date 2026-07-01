@@ -166,38 +166,32 @@ The repo includes a systematic A/B testing framework to compare pipeline configu
 3. A Claude judge scores every answer on three metrics (cross-family: generator ≠ judge)
 4. Results saved to eval_results/ and a comparison table is printed
 
-### Run
-
+Run
+```
 python ab_test.py                          # all variants
 python ab_test.py --names baseline haiku   # compare two specific variants
 python ab_test.py --limit 5                # smoke test on 5 questions
-Built-in variants
+```
 
-┌────────────────┬─────────────────────────────────────────────────────────┐
-│    Variant     │                      What changes                       │
-├────────────────┼─────────────────────────────────────────────────────────┤
-│ baseline       │ claude-sonnet-4-6, k=5, rerank on                       │
-├────────────────┼─────────────────────────────────────────────────────────┤
-│ haiku          │ claude-haiku-4-5-20251001 — speed/cost tradeoff         │
-├────────────────┼─────────────────────────────────────────────────────────┤
-│ wide_retrieval │ k=8, k_retrieve=30 — more context for complex questions │
-├────────────────┼─────────────────────────────────────────────────────────┤
-│ no_rerank      │ skip cross-encoder — faster, potentially noisier        │
-├────────────────┼─────────────────────────────────────────────────────────┤
-│ concise_prompt │ tighter system prompt variant                           │
-└────────────────┴─────────────────────────────────────────────────────────┘
+### Built-in variants
+|   Variant   |   What changes  |
+|---|---|
+|  baseline     | claude-sonnet-4-6, k=5, rerank on   |
+|  haiku   | claude-haiku-4-5-20251001 — speed/cost tradeoff     |
+|  wide_retrieval | k=8, k_retrieve=30 — more context for complex questions|
+| no_rerank  | skip cross-encoder — faster, potentially noisier |
+| concise_prompt| tighter system prompt variant  |
+
+
 
 ### Metrics (RAGAS, reference-free)
+|    Metric      |       What it catches     |
+|---|---|
+|  faithfulness       | answer makes claims not in retrieved chunks (hallucination)  |
+|  answer_relevancy   |  answer drifts off-topic           |
+|   context_precisionl | retriever pulled irrelevant chunks and ranked them high  |
 
-┌───────────────────┬─────────────────────────────────────────────────────────────┐
-│      Metric       │                       What it catches                       │
-├───────────────────┼─────────────────────────────────────────────────────────────┤
-│ faithfulness      │ answer makes claims not in retrieved chunks (hallucination) │
-├───────────────────┼─────────────────────────────────────────────────────────────┤
-│ answer_relevancy  │ answer drifts off-topic                                     │
-├───────────────────┼─────────────────────────────────────────────────────────────┤
-│ context_precision │ retriever pulled irrelevant chunks and ranked them high     │
-└───────────────────┴─────────────────────────────────────────────────────────────┘
+
 
 ### Adding a new variant
 
