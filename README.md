@@ -160,15 +160,9 @@ The repo includes a systematic A/B testing framework to compare pipeline configu
 How it works
 
 1. Define named variants in variants.yaml (one variable changes at a time)
-  my_experiment:
-    model: claude-sonnet-4-6
-    k: 8
-    k_retrieve: 30
-    use_rerank: true
-
-3. Run ab_test.py — each variant answers all 25 eval questions end-to-end
-4. A Claude judge scores every answer on three metrics (cross-family: generator ≠ judge)
-5. Results are saved to eval_results/ and a comparison table is printed
+2. Run ab_test.py — each variant answers all 25 eval questions end-to-end
+3. A Claude judge scores every answer on three metrics (cross-family: generator ≠ judge)
+4. Results are saved to eval_results/ and a comparison table is printed
 
 ```bash
 python ab_test.py                          # all variants
@@ -176,6 +170,23 @@ python ab_test.py --names baseline haiku   # compare two specific variants
 python ab_test.py --names k3 k5 k8         # compare chunk size k=3,5,8 to LLM
 ```
 ---
+Built-in variants
+
+┌────────────────┬─────────────────────────────────────────────────────────┐
+│    Variant     │                      What changes                       │
+├────────────────┼─────────────────────────────────────────────────────────┤
+│ baseline       │ claude-sonnet-4-6, k=5, rerank on                       │
+├────────────────┼─────────────────────────────────────────────────────────┤
+│ haiku          │ claude-haiku-4-5-20251001 — speed/cost tradeoff         │
+├────────────────┼─────────────────────────────────────────────────────────┤
+│ wide_retrieval │ k=8, k_retrieve=30 — more context for complex questions │
+├────────────────┼─────────────────────────────────────────────────────────┤
+│ no_rerank      │ skip cross-encoder — faster, potentially noisier        │
+├────────────────┼─────────────────────────────────────────────────────────┤
+│ concise_prompt │ tighter system prompt variant                           │
+└────────────────┴─────────────────────────────────────────────────────────┘
+
+Sample output
 
 ============================================================
 A/B TEST RESULTS
@@ -201,6 +212,18 @@ Metrics (RAGAS, reference-free)
 ├───────────────────┼─────────────────────────────────────────────────────────────┤
 │ context_precision │ retriever pulled irrelevant chunks and ranked them high     │
 └───────────────────┴─────────────────────────────────────────────────────────────┘
+
+
+Adding a new variant
+
+Add a block to variants.yaml — no code changes needed:
+
+variants:
+  my_experiment:
+    model: claude-sonnet-4-6
+    k: 8
+    k_retrieve: 30
+    use_rerank: true
 
 
 ## Design Decisions
