@@ -158,22 +158,18 @@ Overall keyword match score: 87%
 
 The repo includes a systematic A/B testing framework to compare pipeline configurations — model choice, retrieval depth, reranking, and prompt design — using automated RAGAS scoring across the full eval set.
 
-### How it works
+How it works
 
-1. Define named **variants** in `variants.yaml` (one variable changes at a time)
-2. Run `ab_test.py` — each variant answers all 25 eval questions end-to-end
+1. Define named variants in variants.yaml (one variable changes at a time)
+2. Run ab_test.py — each variant answers all 25 eval questions end-to-end
 3. A Claude judge scores every answer on three metrics (cross-family: generator ≠ judge)
-4. Results saved to `eval_results/` and a comparison table is printed
+4. Results saved to eval_results/ and a comparison table is printed
 
-### Run
+Run
 
-```bash
 python ab_test.py                          # all variants
 python ab_test.py --names baseline haiku   # compare two specific variants
 python ab_test.py --limit 5                # smoke test on 5 questions
-
-
-
 Built-in variants
 
 ┌────────────────┬─────────────────────────────────────────────────────────┐
@@ -197,37 +193,22 @@ Metrics (RAGAS, reference-free)
 ├───────────────────┼─────────────────────────────────────────────────────────────┤
 │ faithfulness      │ answer makes claims not in retrieved chunks (hallucination) │
 ├───────────────────┼─────────────────────────────────────────────────────────────┤
-│ answer_relevancy  │ answer drif                     │
+│ answer_relevancy  │ answer drifts off-topic                                     │
 ├───────────────────┼─────────────────────────────────────────────────────────────┤
-│ context_precision │ retriever pranked them high     │
+│ context_precision │ retriever pulled irrelevant chunks and ranked them high     │
 └───────────────────┴─────────────────────────────────────────────────────────────┘
 
-Sample output
+## Adding a new variant
 
-============================================================
-A/B TEST RESULTS
-============================================================
-Variant           faithfulness   precision
-baseline          0.847           0.912              0.761
-haiku             0.798
-============================================================
-
-Best variant per metric:
-  faithfulness        → baseline
-  answer_relevancy    → baseline  (0.912)
-  context_precision   → baseline
-```
-
-### Adding a new variant
-
-Add a block to variants.yaml — no
-
-variants:
-  my_experiment:
-    model: claude-sonnet-4-6
-    k: 8
-    k_retrieve: 30
-    use_rerank: true
+Add a block to variants.yaml — no code changes needed:
+   
+   variants:
+     my_experiment:
+       model: claude-sonnet-4-6
+       k: 8
+       k_retrieve: 30
+       use_rerank: true
+---
 
 
 ## Design Decisions
