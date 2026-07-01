@@ -67,6 +67,7 @@ swot_rag/
 ├── rag_engine.py      ← Core RAG: retrieve → prompt → answer + citations
 ├── app.py             ← Streamlit web UI
 ├── evaluate.py        ← Quality evaluation with domain-specific test questions
+├── ab_test.py         ← Compare multiple RAG pipeline configurations with RAGAS scoring
 │
 ├── requirements.txt
 └── .env.example
@@ -152,8 +153,55 @@ Q2: How does SWOT detect abyssal marine tectonics?
 
 Overall keyword match score: 87%
 ```
+## A/B testing
 
+The repo includes a systematic A/B testing framework to compare pipeline configurations — model choice, retrieval depth, reranking, and prompt design — using automated RAGAS scoring across the full eval set.
+
+How it works
+
+1. Define named variants in variants.yaml (one variable changes at a time)
+  my_experiment:
+    model: claude-sonnet-4-6
+    k: 8
+    k_retrieve: 30
+    use_rerank: true
+
+3. Run ab_test.py — each variant answers all 25 eval questions end-to-end
+4. A Claude judge scores every answer on three metrics (cross-family: generator ≠ judge)
+5. Results are saved to eval_results/ and a comparison table is printed
+
+```bash
+python ab_test.py                          # all variants
+python ab_test.py --names baseline haiku   # compare two specific variants
+python ab_test.py --names k3 k5 k8         # compare chunk size k=3,5,8 to LLM
+```
 ---
+
+============================================================
+A/B TEST RESULTS
+============================================================
+Variant           faithfulness    answer_relevancy   context_precision
+baseline          0.847           0.912              0.761
+haiku             0.798           0.883              0.734
+============================================================
+
+Best variant per metric:
+  faithfulness        → baseline  (0.847)
+  answer_relevancy    → baseline  (0.912)
+  context_precision   → baseline  (0.761)
+
+Metrics (RAGAS, reference-free)
+
+┌───────────────────┬─────────────────────────────────────────────────────────────┐
+│      Metric       │                       What it catches                       │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ faithfulness      │ answer makes claims not in retrieved chunks (hallucination) │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ answer_relevancy  │ answer drifts off-topic                                     │
+├───────────────────┼─────────────────────────────────────────────────────────────┤
+│ context_precision │ retriever pulled irrelevant chunks and ranked them high     │
+└───────────────────┴─────────────────────────────────────────────────────────────┘
+
 
 ## Design Decisions
 
