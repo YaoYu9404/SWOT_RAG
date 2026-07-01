@@ -70,6 +70,7 @@ This will:
 ### 5. Launch the app
 ```bash
 streamlit run app.py
+# Or python -m streamlit run app.py
 ```
 Opens at http://localhost:8501
 
@@ -88,11 +89,77 @@ Opens at http://localhost:8501
 
 ## Evaluation
 
-After ingestion, test quality with:
+### Quick keyword check
+
+Smoke-test retrieval with a hand-written keyword list:
 ```bash
 python evaluate.py
 ```
 Target: >70% keyword match score. If lower, add more papers or increase chunk overlap.
+
+### RAGAS — LLM-as-a-judge evaluation
+
+For proper, reference-free scoring use the RAGAS suite:
+```bash
+python ragas_eval.py                         # all questions, defaults
+python ragas_eval.py --limit 5               # smoke test on 5
+python ragas_eval.py --with-ground-truth-only  # adds recall + correctness
+```
+
+Scores the pipeline on:
+
+| Metric | What it catches | Needs reference answer? |
+|---|---|---|
+| `faithfulness` | answer makes claims not in retrieved chunks (hallucination) | no |
+| `answer_relevancy` | answer drifts off-topic | no |
+| `context_precision` | retriever pulled irrelevant chunks and ranked them high | no |
+| `context_recall` | retriever missed a chunk needed for the reference answer | yes |
+| `answer_correctness` | semantic match to a reference answer | yes |
+
+**Design choice — cross-family judge.** The generator is GPT-4o (OpenAI) but the
+RAGAS judge is Claude Sonnet (Anthropic). Using a different model family for the
+judge avoids "the model agrees with itself" bias and makes scores defensible when
+comparing pipelines.
+
+**Required env vars:** `OPENAI_API_KEY` (generator + embedder) and
+`ANTHROPIC_API_KEY` (judge), both read from `.env`.
+
+**Questions live in `eval_questions.jsonl`** — one JSON object per line with a
+`question` field and optional `ground_truth` / `tags`. Add more as you discover
+failure modes; the recall + correctness metrics activate automatically for any
+row that has a `ground_truth`.
+
+Results land in `eval_results/ragas_<tag>_<timestamp>.{csv,json}` — the JSON
+also includes the retrieved sources per row so failing questions are easy to
+triage.
+
+---
+
+## A/B testing
+
+Compare named pipeline variants (model, retrieval depth, reranking, prompt) on the full eval set:
+
+```bash
+python ab_test.py                              # all 5 variants, all questions
+python ab_test.py --limit 5                    # smoke test on first 5 questions
+python ab_test.py --names baseline haiku       # only compare these two
+```
+
+Variants are defined in `variants.yaml`. Built-in variants:
+
+| Variant | What it tests |
+|---|---|
+| `baseline` | claude-sonnet-4-6, k=5, k_retrieve=20, rerank on |
+| `haiku` | claude-haiku-4-5-20251001 — cost vs quality tradeoff |
+| `wide_retrieval` | k=8, k_retrieve=30 — more context for multi-part questions |
+| `no_rerank` | skip the cross-encoder — faster, potentially noisier |
+| `concise_prompt` | tighter system prompt variant |
+
+The script scores each variant with RAGAS (faithfulness, answer_relevancy, context_precision)
+and prints a comparison table. Per-variant CSVs and a summary land in `eval_results/`.
+
+**UI comparison:** The Streamlit app's **Compare variants** tab lets you run two
+configurations side by side on a single question without touching the CLI.
 
 ---
 

@@ -1,0 +1,66 @@
+# A/B test variants for the SWOT RAG pipeline.
+# Each variant is a named config passed to rag_engine.query().
+# Run:  python ab_test.py
+#       python ab_test.py --names baseline haiku --limit 5
+
+variants:
+
+  baseline:
+    model: claude-sonnet-4-6
+    k: 5
+    k_retrieve: 20
+    use_rerank: true
+
+  haiku:
+    # ~10x cheaper; use to check whether quality drop is acceptable
+    model: claude-haiku-4-5-20251001
+    k: 5
+    k_retrieve: 20
+    use_rerank: true
+
+  wide_retrieval:
+    # More chunks passed to the LLM — better recall for multi-faceted questions
+    model: claude-sonnet-4-6
+    k: 8
+    k_retrieve: 30
+    use_rerank: true
+
+  no_rerank:
+    # Skip the cross-encoder; faster but may pass noisier context to the LLM
+    model: claude-sonnet-4-6
+    k: 5
+    k_retrieve: 5
+    use_rerank: false
+
+  k3:
+    # Fewer chunks — tighter context, less noise
+    model: claude-sonnet-4-6
+    k: 3
+    k_retrieve: 20
+    use_rerank: true
+
+  k5:
+    # Baseline chunk count
+    model: claude-sonnet-4-6
+    k: 5
+    k_retrieve: 20
+    use_rerank: true
+
+  k8:
+    # More chunks — better recall for multi-part questions, more noise risk
+    model: claude-sonnet-4-6
+    k: 8
+    k_retrieve: 20
+    use_rerank: true
+
+  concise_prompt:
+    # Tighter system prompt — trades citation depth for brevity
+    model: claude-sonnet-4-6
+    k: 5
+    k_retrieve: 20
+    use_rerank: true
+    system_prompt: |
+      You are a concise scientific assistant for the SWOT satellite mission.
+      Answer using ONLY the provided context chunks — no outside knowledge.
+      Be precise and brief. Always cite sources as [filename, p.N].
+      If the context is insufficient, say so directly.

@@ -5,22 +5,45 @@ This module is imported by app.py (Streamlit UI) and can also be used standalone
 """
 
 import os
+os.environ.setdefault("USE_TORCH", "1")  # prevent sentence-transformers from importing TF
+
 from dataclasses import dataclass
 from dotenv import load_dotenv
 
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
+from langchain_openai import OpenAIEmbeddings
+from langchain_anthropic import ChatAnthropic
 from langchain_community.vectorstores import FAISS
 from langchain.schema import Document
+from sentence_transformers import CrossEncoder
 
 load_dotenv()
+
+# Cross-encoder for re-ranking retrieved chunks. Loaded once and reused across queries.
+# ms-marco-MiniLM-L-6-v2 is a small, fast cross-encoder trained for passage re-ranking.
+_RERANKER = None
+
+
+def get_reranker() -> CrossEncoder:
+    global _RERANKER
+    if _RERANKER is None:
+        _RERANKER = CrossEncoder("cross-encoder/ms-marco-MiniLM-L-6-v2")
+    return _RERANKER
 
 
 @dataclass
 class RAGResponse:
-    """Structured response with answer + cited sources."""
+    """Structured response with answer + cited sources.
+
+    Fields:
+        answer:   LLM-generated answer string
+        sources:  list of dicts with source_file, page, snippet (display-friendly)
+        query:    the original question
+        contexts: raw retrieved chunk texts (used by RAGAS and other evaluators)
+    """
     answer: str
     sources: list
     query: str
+    contexts: list = None  # populated in query(); default keeps backwards compat
 
 
 SYSTEM_PROMPT = """You are a scientific assistant specializing in SWOT (Surface Water and Ocean Topography) 
@@ -35,17 +58,18 @@ Rules:
    ~21-day repeat, 120 km swath, ~2 cm accuracy goal).
 """
 
-def load_retriever(index_path: str = "faiss_index", k: int = 5):
+def load_retriever(index_path: str = "faiss_index", k: int = 20):
     """
     Load FAISS index from disk and return a retriever.
-    
-    k=5 retrieved chunks is a good default:
-    - Enough context for multi-faceted questions
-    - Fits comfortably in GPT-4o's context window even with long chunks
+
+    k=20 candidates here is the *first-stage* retrieval pool — wider than what
+    we actually feed the LLM, so the cross-encoder re-ranker (see rerank())
+    has a meaningful set of candidates to re-score before we truncate to the
+    final top-k passed to the LLM in query().
     """
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
     vectorstore = FAISS.load_local(
-        index_path, 
+        index_path,
         embeddings,
         allow_dangerous_deserialization=True  # required for local FAISS files
     )
@@ -54,6 +78,25 @@ def load_retriever(index_path: str = "faiss_index", k: int = 5):
         search_kwargs={"k": k}
     )
     return retriever
+
+
+def rerank(question: str, docs: list, top_k: int = 5) -> list:
+    """
+    Re-rank candidate chunks with a cross-encoder and keep the top_k.
+
+    Why a second stage: FAISS similarity search (bi-encoder) embeds the query
+    and each chunk independently, so it's fast but only approximates true
+    relevance. A cross-encoder jointly encodes (query, chunk) pairs, which is
+    slower but scores relevance far more accurately — standard two-stage
+    retrieve-then-rerank pattern.
+    """
+    if not docs:
+        return docs
+    reranker = get_reranker()
+    pairs = [[question, doc.page_content] for doc in docs]
+    scores = reranker.predict(pairs)
+    ranked = sorted(zip(docs, scores), key=lambda pair: pair[1], reverse=True)
+    return [doc for doc, _ in ranked[:top_k]]
 
 
 def format_context(docs: list) -> str:
@@ -82,34 +125,44 @@ Sources: [1] filename p.X, [2] filename p.Y, ...
 """
 
 
-def query(question: str, index_path: str = "faiss_index", k: int = 5, 
-          model: str = "gpt-4o") -> RAGResponse:
+def query(question: str, index_path: str = "faiss_index", k: int = 5,
+          k_retrieve: int = 20, model: str = "claude-sonnet-4-6",
+          use_rerank: bool = True, system_prompt: str = None) -> RAGResponse:
     """
-    Main RAG query function.
-    
+    Main RAG query function — two-stage retrieve-then-rerank.
+
     Args:
         question: The scientific question to answer
         index_path: Path to saved FAISS index
-        k: Number of chunks to retrieve
-        model: OpenAI model to use (gpt-4o recommended for scientific reasoning)
-    
+        k: Number of chunks to keep after re-ranking and pass to the LLM
+        k_retrieve: Number of candidates pulled from FAISS before re-ranking
+        model: Anthropic model to use (claude-sonnet-4-6 recommended for scientific reasoning;
+               claude-haiku-4-5-20251001 for a ~10x cheaper option)
+        use_rerank: If False, skip the cross-encoder and use the top-k FAISS results directly
+        system_prompt: Override the default SYSTEM_PROMPT (for A/B testing prompt variants)
+
     Returns:
         RAGResponse with answer, sources, and original query
     """
-    # 1. Load retriever
-    retriever = load_retriever(index_path, k)
-    
-    # 2. Retrieve relevant chunks
-    docs = retriever.invoke(question)
-    
+    # 1. Load retriever — when skipping rerank, retrieve only k (no need for a wide pool)
+    fetch_k = k_retrieve if use_rerank else k
+    retriever = load_retriever(index_path, fetch_k)
+    candidates = retriever.invoke(question)
+
+    # 2. Re-rank candidates with a cross-encoder (slower/precise) and keep top-k, or skip
+    if use_rerank:
+        docs = rerank(question, candidates, top_k=k)
+    else:
+        docs = candidates[:k]
+
     # 3. Build context string
     context = format_context(docs)
     
     # 4. Call LLM
-    llm = ChatOpenAI(model=model, temperature=0)
+    llm = ChatAnthropic(model=model, temperature=0, max_tokens=1024)
     from langchain.schema import SystemMessage, HumanMessage
     messages = [
-        SystemMessage(content=SYSTEM_PROMPT),
+        SystemMessage(content=system_prompt or SYSTEM_PROMPT),
         HumanMessage(content=build_prompt(question, context)),
     ]
     response = llm.invoke(messages)
@@ -123,8 +176,11 @@ def query(question: str, index_path: str = "faiss_index", k: int = 5,
             "page": doc.metadata.get("page", "?"),
             "snippet": doc.page_content[:200] + "...",
         })
-    
-    return RAGResponse(answer=answer, sources=sources, query=question)
+
+    # 6. Also expose the raw chunk texts so RAGAS / other evaluators can score grounding
+    contexts = [doc.page_content for doc in docs]
+
+    return RAGResponse(answer=answer, sources=sources, query=question, contexts=contexts)
 
 
 if __name__ == "__main__":
