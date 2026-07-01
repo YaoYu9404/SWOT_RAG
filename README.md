@@ -172,6 +172,8 @@ python ab_test.py                          # all variants
 python ab_test.py --names baseline haiku   # compare two specific variants
 python ab_test.py --limit 5                # smoke test on 5 questions
 
+```
+
 Built-in variants
 
 ┌────────────────┬─────────────────────────────────────────────────────────┐
