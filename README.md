@@ -202,12 +202,12 @@ Metrics (RAGAS, reference-free)
 
 Add a block to variants.yaml — no code changes needed:
    
-   variants:
-     my_experiment:
-       model: claude-sonnet-4-6
-       k: 8
-       k_retrieve: 30
-       use_rerank: true
+variants:
+  my_experiment:
+    model: claude-sonnet-4-6
+    k: 8
+    k_retrieve: 30
+    use_rerank: true
 ---
 
 
