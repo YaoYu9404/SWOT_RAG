@@ -172,7 +172,7 @@ python ab_test.py                          # all variants
 python ab_test.py --names baseline haiku   # compare two specific variants
 python ab_test.py --limit 5                # smoke test on 5 questions
 
-```
+
 
 Built-in variants
 
@@ -216,8 +216,9 @@ Best variant per metric:
   faithfulness        → baseline
   answer_relevancy    → baseline  (0.912)
   context_precision   → baseline
+```
 
-Adding a new variant
+### Adding a new variant
 
 Add a block to variants.yaml — no
 
