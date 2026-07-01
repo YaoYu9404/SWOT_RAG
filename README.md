@@ -153,23 +153,25 @@ Q2: How does SWOT detect abyssal marine tectonics?
 
 Overall keyword match score: 87%
 ```
-## A/B testing
+
+## A/B Testing
 
 The repo includes a systematic A/B testing framework to compare pipeline configurations — model choice, retrieval depth, reranking, and prompt design — using automated RAGAS scoring across the full eval set.
 
-How it works
+### How it works
 
-1. Define named variants in variants.yaml (one variable changes at a time)
-2. Run ab_test.py — each variant answers all 25 eval questions end-to-end
+1. Define named **variants** in `variants.yaml` (one variable changes at a time)
+2. Run `ab_test.py` — each variant answers all 25 eval questions end-to-end
 3. A Claude judge scores every answer on three metrics (cross-family: generator ≠ judge)
-4. Results are saved to eval_results/ and a comparison table is printed
+4. Results saved to `eval_results/` and a comparison table is printed
+
+### Run
 
 ```bash
 python ab_test.py                          # all variants
 python ab_test.py --names baseline haiku   # compare two specific variants
-python ab_test.py --names k3 k5 k8         # compare chunk size k=3,5,8 to LLM
-```
----
+python ab_test.py --limit 5                # smoke test on 5 questions
+
 Built-in variants
 
 ┌────────────────┬─────────────────────────────────────────────────────────┐
@@ -186,21 +188,6 @@ Built-in variants
 │ concise_prompt │ tighter system prompt variant                           │
 └────────────────┴─────────────────────────────────────────────────────────┘
 
-Sample output
-
-============================================================
-A/B TEST RESULTS
-============================================================
-Variant           faithfulness    answer_relevancy   context_precision
-baseline          0.847           0.912              0.761
-haiku             0.798           0.883              0.734
-============================================================
-
-Best variant per metric:
-  faithfulness        → baseline  (0.847)
-  answer_relevancy    → baseline  (0.912)
-  context_precision   → baseline  (0.761)
-
 Metrics (RAGAS, reference-free)
 
 ┌───────────────────┬─────────────────────────────────────────────────────────────┐
@@ -208,15 +195,29 @@ Metrics (RAGAS, reference-free)
 ├───────────────────┼─────────────────────────────────────────────────────────────┤
 │ faithfulness      │ answer makes claims not in retrieved chunks (hallucination) │
 ├───────────────────┼─────────────────────────────────────────────────────────────┤
-│ answer_relevancy  │ answer drifts off-topic                                     │
+│ answer_relevancy  │ answer drif                     │
 ├───────────────────┼─────────────────────────────────────────────────────────────┤
-│ context_precision │ retriever pulled irrelevant chunks and ranked them high     │
+│ context_precision │ retriever pranked them high     │
 └───────────────────┴─────────────────────────────────────────────────────────────┘
 
+Sample output
+
+============================================================
+A/B TEST RESULTS
+============================================================
+Variant           faithfulness   precision
+baseline          0.847           0.912              0.761
+haiku             0.798
+============================================================
+
+Best variant per metric:
+  faithfulness        → baseline
+  answer_relevancy    → baseline  (0.912)
+  context_precision   → baseline
 
 Adding a new variant
 
-Add a block to variants.yaml — no code changes needed:
+Add a block to variants.yaml — no
 
 variants:
   my_experiment:
